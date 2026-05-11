@@ -1,57 +1,42 @@
 import numpy as np
-from hmmlearn import hmm
 
-# Definir un modelo HMM simple para reconocimiento de habla
-# Estados: fonemas (ejemplo simplificado: 'a', 'e', 'i')
-# Observaciones: características acústicas (MFCCs simuladas)
+def algoritmo_viterbi(observaciones, estados, prob_inicio, prob_transicion, prob_emision):
+    # 1. Inicialización
+    viterbi = np.zeros((len(estados), len(observaciones)))
+    camino = np.zeros((len(estados), len(observaciones)), dtype=int)
 
-# Número de estados (fonemas)
-n_states = 3
-# Número de observaciones posibles (simplificado)
-n_obs = 5
+    for s in range(len(estados)):
+        viterbi[s, 0] = prob_inicio[s] * prob_emision[s][observaciones[0]]
 
-# Crear el modelo HMM
-model = hmm.MultinomialHMM(n_components=n_states, n_iter=100)
+    # 2. Recursión (Paso del tiempo)
+    for t in range(1, len(observaciones)):
+        for s in range(len(estados)):
+            # Calculamos la probabilidad máxima para llegar al estado 's' en el tiempo 't'
+            probabilidades = viterbi[:, t-1] * prob_transicion[:, s] * prob_emision[s][observaciones[t]]
+            viterbi[s, t] = np.max(probabilidades)
+            camino[s, t] = np.argmax(probabilidades)
 
-# Matrices de transición (probabilidades de cambiar de estado)
-# Ejemplo simplificado
-transmat = np.array([[0.7, 0.2, 0.1],
-                     [0.1, 0.8, 0.1],
-                     [0.2, 0.1, 0.7]])
+    # 3. Terminación y reconstrucción del camino
+    secuencia_optima = np.zeros(len(observaciones), dtype=int)
+    secuencia_optima[-1] = np.argmax(viterbi[:, -1])
 
-# Matrices de emisión (probabilidades de observar algo en cada estado)
-emissionprob = np.array([[0.5, 0.3, 0.1, 0.05, 0.05],
-                         [0.1, 0.4, 0.3, 0.15, 0.05],
-                         [0.05, 0.1, 0.5, 0.3, 0.05]])
+    for t in range(len(observaciones) - 2, -1, -1):
+        secuencia_optima[t] = camino[secuencia_optima[t+1], t+1]
 
-# Probabilidades iniciales
-startprob = np.array([0.4, 0.3, 0.3])
+    return secuencia_optima
 
-# Configurar el modelo
-model.startprob_ = startprob
-model.transmat_ = transmat
-model.emissionprob_ = emissionprob
+# --- DATOS DE EJEMPLO ---
+# Estados: 0='Fonema A', 1='Fonema B'
+# Observaciones: 0='Sonido Grave', 1='Sonido Agudo'
+estados = [0, 1]
+obs_secuencia = [0, 1, 1] # Escuchamos: Grave, Agudo, Agudo
 
-# Simular una secuencia de observaciones (señal de habla)
-# Longitud de la secuencia
-length = 10
-# Generar observaciones aleatorias basadas en el modelo
-X, Z = model.sample(length)
+p_inicio = np.array([0.6, 0.4])
+p_transicion = np.array([[0.7, 0.3], 
+                         [0.4, 0.6]])
+p_emision = np.array([[0.8, 0.2],  # El Fonema A suele ser Grave
+                      [0.1, 0.9]]) # El Fonema B suele ser Agudo
 
-print("Secuencia de observaciones (características acústicas):", X.flatten())
-print("Secuencia de estados ocultos (fonemas):", Z)
-
-# Entrenar el modelo con datos (en un caso real, usar datos de entrenamiento)
-# Aquí, usamos la secuencia generada para demostrar
-model.fit(X)
-
-# Predecir la secuencia de estados para nuevas observaciones
-# Simular nuevas observaciones
-X_new, _ = model.sample(5)
-predicted_states = model.predict(X_new)
-
-print("Nuevas observaciones:", X_new.flatten())
-print("Estados predichos:", predicted_states)
-
-# Nota: Este es un ejemplo simplificado. En reconocimiento de habla real,
-# se usan modelos más complejos con GMMs, redes neuronales, etc.
+# Ejecución
+resultado = algoritmo_viterbi(obs_secuencia, estados, p_inicio, p_transicion, p_emision)
+print(f"Secuencia de fonemas más probable: {resultado}")
